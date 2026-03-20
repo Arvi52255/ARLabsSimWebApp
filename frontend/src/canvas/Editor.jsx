@@ -1,7 +1,7 @@
 import { Stage, Layer, Line } from "react-konva";
 import { useState } from "react";
 import Resistor from "../components/Resistor";
-import Battery from "../components/battery";
+import Battery from "../components/Battery";
 import LED from "../components/LED";
 
 export default function Editor() {
@@ -12,6 +12,7 @@ export default function Editor() {
       x: 100,
       y: 100,
       rotation: 0,
+      voltage: 9,
       pins: [
         { id: "positive", dx: -10, dy: 20 },
         { id: "negative", dx: 90, dy: 20 }
@@ -23,6 +24,9 @@ export default function Editor() {
       x: 300,
       y: 120,
       rotation: 0,
+      forwardVoltage: 2,
+      isOn: false,
+      brightness: 0,
       pins: [
         { id: "anode", dx: -25, dy: 0 },
         { id: "cathode", dx: 25, dy: 0 }
@@ -44,6 +48,8 @@ export default function Editor() {
 
   const [wires, setWires] = useState([]);
   const [selectedPin, setSelectedPin] = useState(null);
+  const [selectedComponentId, setSelectedComponentId] = useState(null);
+  const [simulationResult, setSimulationResult] = useState(null);
 
   const updateComponentPosition = (id, newX, newY) => {
     console.log("Updating position:", id, newX, newY);
@@ -61,6 +67,16 @@ export default function Editor() {
     setComponents((prevComponents) =>
       prevComponents.map((comp) =>
         comp.id === id ? { ...comp, rotation: newRotation } : comp
+      )
+    );
+  };
+
+  const updateComponentField = (id, field, newValue) => {
+    console.log("Updating field:", id, field, newValue);
+
+    setComponents((prevComponents) =>
+      prevComponents.map((comp) =>
+        comp.id === id ? { ...comp, [field]: newValue } : comp
       )
     );
   };
@@ -121,6 +137,7 @@ export default function Editor() {
     console.log("Clearing all wires");
     setWires([]);
     setSelectedPin(null);
+    setSimulationResult(null);
   };
 
   const makePinKey = (componentId, pinId) => `${componentId}:${pinId}`;
@@ -136,14 +153,12 @@ export default function Editor() {
       if (!graph[b].includes(a)) graph[b].push(a);
     };
 
-    // External wire connections
     wires.forEach((wire) => {
       const fromKey = makePinKey(wire.from.componentId, wire.from.pinId);
       const toKey = makePinKey(wire.to.componentId, wire.to.pinId);
       addEdge(fromKey, toKey);
     });
 
-    // Internal pass-through connections
     components.forEach((comp) => {
       if (comp.type === "resistor") {
         addEdge(makePinKey(comp.id, "A"), makePinKey(comp.id, "B"));
@@ -178,11 +193,18 @@ export default function Editor() {
     return false;
   };
 
-  const getLedIsOn = () => {
+  const runSimulation = () => {
     const battery = components.find((c) => c.type === "battery");
     const led = components.find((c) => c.type === "led");
+    const resistor = components.find((c) => c.type === "resistor");
 
-    if (!battery || !led) return false;
+    if (!battery || !led || !resistor) {
+      setSimulationResult({
+        valid: false,
+        error: "Battery, LED, or resistor is missing."
+      });
+      return;
+    }
 
     const graph = buildConnectionGraph();
 
@@ -198,10 +220,36 @@ export default function Editor() {
     console.log("Positive path:", positivePath);
     console.log("Negative path:", negativePath);
 
-    return positivePath && negativePath;
+    if (!positivePath || !negativePath) {
+      setSimulationResult({
+        valid: false,
+        error: "Open circuit or incorrect LED connection."
+      });
+      return;
+    }
+
+    if ((resistor.value || 0) <= 0) {
+      setSimulationResult({
+        valid: false,
+        error: "Resistance must be greater than zero."
+      });
+      return;
+    }
+
+    const usableVoltage = (battery.voltage || 0) - (led.forwardVoltage || 0);
+    const current = usableVoltage > 0 ? usableVoltage / resistor.value : 0;
+
+    let brightness = current / 0.02;
+    brightness = Math.max(0, Math.min(brightness, 1));
+
+    setSimulationResult({
+      valid: true,
+      current,
+      ledOn: current > 0,
+      brightness
+    });
   };
 
-  // Rotation-aware pin world position
   const getPinPosition = (component, pin) => {
     if (!component || !pin) return null;
 
@@ -216,7 +264,6 @@ export default function Editor() {
     };
   };
 
-  // Helper using componentId and pinId
   const getPinPositionById = (componentId, pinId) => {
     const component = components.find((c) => c.id === componentId);
     if (!component) return null;
@@ -227,12 +274,20 @@ export default function Editor() {
     return getPinPosition(component, pin);
   };
 
-  const ledIsOn = getLedIsOn();
+  const selectedComponent = components.find(
+    (comp) => comp.id === selectedComponentId
+  );
+
+  const ledIsOn = simulationResult?.valid ? simulationResult.ledOn : false;
+  const ledBrightness = simulationResult?.valid
+    ? simulationResult.brightness
+    : 0;
 
   const saveCircuit = async () => {
     const circuitData = {
       components,
-      wires
+      wires,
+      simulationResult
     };
 
     console.log("Sending to backend:", circuitData);
@@ -258,11 +313,15 @@ export default function Editor() {
   const renderComponent = (comp) => {
     const commonProps = {
       key: comp.id,
-      data: comp.type === "led" ? { ...comp, isOn: ledIsOn } : comp,
+      data:
+        comp.type === "led"
+          ? { ...comp, isOn: ledIsOn, brightness: ledBrightness }
+          : comp,
       selectedPin,
       onDragEnd: updateComponentPosition,
       onRotate: updateComponentRotation,
-      onPinClick: handlePinClick
+      onPinClick: handlePinClick,
+      onSelect: setSelectedComponentId
     };
 
     if (comp.type === "battery") {
@@ -306,6 +365,18 @@ export default function Editor() {
         Clear Wires
       </button>
 
+      <button
+        onClick={runSimulation}
+        style={{
+          position: "absolute",
+          top: 45,
+          left: 120,
+          zIndex: 10
+        }}
+      >
+        Simulate
+      </button>
+
       {/* Below is displayer for on screen live change confirmer */}
       {/*}  <div
       style={{
@@ -333,7 +404,7 @@ export default function Editor() {
           padding: "6px"
         }}
       >
-        DEPLOY TEST v7. Resistor Update
+        DEPLOY TEST v9. Component Value and LED Brightness Update
       </div>
 
       {/* LED status confirmer */}
@@ -365,12 +436,121 @@ export default function Editor() {
         Wires: {wires.length} | Click a wire to delete it
       </div>
 
+      <div
+        style={{
+          position: "absolute",
+          top: 200,
+          left: 10,
+          zIndex: 10,
+          background: "#e8f4ff",
+          padding: "8px",
+          border: "1px solid black",
+          minWidth: "220px"
+        }}
+      >
+        <div>
+          <strong>Simulation Result</strong>
+        </div>
+
+        {!simulationResult && <div>Not simulated yet</div>}
+
+        {simulationResult?.error && <div>Error: {simulationResult.error}</div>}
+
+        {simulationResult?.valid && (
+          <>
+            <div>Current: {simulationResult.current.toFixed(4)} A</div>
+            <div>LED: {simulationResult.ledOn ? "ON" : "OFF"}</div>
+            <div>
+              Brightness: {(simulationResult.brightness * 100).toFixed(0)}%
+            </div>
+          </>
+        )}
+      </div>
+
+      {selectedComponent && (
+        <div
+          style={{
+            position: "absolute",
+            top: 320,
+            left: 10,
+            zIndex: 10,
+            background: "white",
+            padding: "10px",
+            border: "1px solid black",
+            minWidth: "240px"
+          }}
+        >
+          <div style={{ marginBottom: "8px" }}>
+            <strong>Selected:</strong> {selectedComponent.type}
+          </div>
+
+          {selectedComponent.type === "battery" && (
+            <div>
+              <label>Voltage: </label>
+              <input
+                type="number"
+                value={selectedComponent.voltage || 0}
+                onChange={(e) =>
+                  updateComponentField(
+                    selectedComponent.id,
+                    "voltage",
+                    Number(e.target.value)
+                  )
+                }
+              />
+            </div>
+          )}
+
+          {selectedComponent.type === "resistor" && (
+            <div>
+              <label>Resistance (Ω): </label>
+              <input
+                type="number"
+                value={selectedComponent.value || 0}
+                onChange={(e) =>
+                  updateComponentField(
+                    selectedComponent.id,
+                    "value",
+                    Number(e.target.value)
+                  )
+                }
+              />
+            </div>
+          )}
+
+          {selectedComponent.type === "led" && (
+            <div>
+              <label>Forward Voltage: </label>
+              <input
+                type="number"
+                step="0.1"
+                value={selectedComponent.forwardVoltage || 0}
+                onChange={(e) =>
+                  updateComponentField(
+                    selectedComponent.id,
+                    "forwardVoltage",
+                    Number(e.target.value)
+                  )
+                }
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       <Stage
         width={window.innerWidth}
         height={window.innerHeight}
-        onClick={(e) => {
+        onMouseDown={(e) => {
           if (e.target === e.target.getStage()) {
             setSelectedPin(null);
+            setSelectedComponentId(null);
+          }
+        }}
+        onTap={(e) => {
+          if (e.target === e.target.getStage()) {
+            setSelectedPin(null);
+            setSelectedComponentId(null);
           }
         }}
       >
@@ -380,10 +560,7 @@ export default function Editor() {
               wire.from.componentId,
               wire.from.pinId
             );
-            const to = getPinPositionById(
-              wire.to.componentId,
-              wire.to.pinId
-            );
+            const to = getPinPositionById(wire.to.componentId, wire.to.pinId);
 
             if (!from || !to) return null;
 

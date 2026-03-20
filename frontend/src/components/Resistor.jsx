@@ -5,7 +5,8 @@ export default function Resistor({
   selectedPin,
   onDragEnd,
   onRotate,
-  onPinClick
+  onPinClick,
+  onSelect
 }) {
   const handleDragEnd = (e) => {
     onDragEnd(data.id, e.target.x(), e.target.y());
@@ -24,6 +25,10 @@ export default function Resistor({
       rotation={data.rotation}
       onDragEnd={handleDragEnd}
       onDblClick={handleDoubleClick}
+      onClick={(e) => {
+        e.cancelBubble = true;
+        onSelect(data.id);
+      }}
     >
       <Rect width={80} height={30} fill="lightgray" stroke="black" />
       <Text text="R" x={18} y={6} fontSize={12} />

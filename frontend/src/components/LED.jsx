@@ -5,7 +5,8 @@ export default function LED({
   selectedPin,
   onDragEnd,
   onRotate,
-  onPinClick
+  onPinClick,
+  onSelect
 }) {
   const handleDragEnd = (e) => {
     onDragEnd(data.id, e.target.x(), e.target.y());
@@ -16,7 +17,13 @@ export default function LED({
     onRotate(data.id, newRotation);
   };
 
-  const glowColor = data.isOn ? "limegreen" : "#444";
+  const brightness = Math.max(0, Math.min(data.brightness || 0, 1));
+  const isOn = data.isOn;
+
+  const glowFill = isOn ? "limegreen" : "#444";
+  const glowBlur = isOn ? 10 + brightness * 35 : 0;
+  const glowOpacity = isOn ? 0.25 + brightness * 0.75 : 0;
+  const outerRadius = 24 + brightness * 8;
 
   return (
     <Group
@@ -26,15 +33,38 @@ export default function LED({
       rotation={data.rotation}
       onDragEnd={handleDragEnd}
       onDblClick={handleDoubleClick}
+      onClick={(e) => {
+        e.cancelBubble = true;
+        onSelect(data.id);
+      }}
     >
+      {/* Outer glow */}
+      {isOn && (
+        <Circle
+          radius={outerRadius}
+          fill="limegreen"
+          opacity={0.12 + brightness * 0.28}
+          listening={false}
+        />
+      )}
+
+      {/* Main LED body */}
       <Circle
         radius={18}
-        fill={glowColor}
+        fill={glowFill}
         stroke="black"
         strokeWidth={2}
-        shadowColor={data.isOn ? "limegreen" : undefined}
-        shadowBlur={data.isOn ? 25 : 0}
-        shadowOpacity={data.isOn ? 0.9 : 0}
+        shadowColor="limegreen"
+        shadowBlur={glowBlur}
+        shadowOpacity={glowOpacity}
+      />
+
+      {/* Inner highlight */}
+      <Circle
+        radius={10}
+        fill={isOn ? "palegreen" : "#666"}
+        opacity={isOn ? 0.35 + brightness * 0.4 : 0.3}
+        listening={false}
       />
 
       <Text text="LED" x={-12} y={24} fontSize={12} />
