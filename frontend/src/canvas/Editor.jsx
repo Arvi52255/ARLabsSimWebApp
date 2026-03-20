@@ -1,0 +1,297 @@
+import { Stage, Layer, Line } from "react-konva";
+import { useEffect, useState } from "react";
+import Resistor from "../components/Resistor";
+import Battery from "../components/battery";
+import LED from "../components/LED";
+
+export default function Editor() {
+  const [components, setComponents] = useState([
+    {
+      id: 1,
+      type: "battery",
+      x: 100,
+      y: 100,
+      rotation: 0,
+      pins: [
+        { id: "positive", dx: -10, dy: 20 },
+        { id: "negative", dx: 90, dy: 20 }
+      ]
+    },
+    {
+      id: 2,
+      type: "led",
+      x: 300,
+      y: 120,
+      rotation: 0,
+      isOn: false,
+      pins: [
+        { id: "anode", dx: -25, dy: 0 },
+        { id: "cathode", dx: 25, dy: 0 }
+      ]
+    },
+    {
+      id: 3,
+      type: "resistor",
+      x: 500,
+      y: 200,
+      rotation: 0,
+      pins: [
+        { id: "A", dx: -10, dy: 15 },
+        { id: "B", dx: 90, dy: 15 }
+      ]
+    }
+  ]);
+
+  const [wires, setWires] = useState([]);
+  const [selectedPin, setSelectedPin] = useState(null);
+
+  const updateComponentPosition = (id, newX, newY) => {
+    console.log("Updating position:", id, newX, newY);
+
+    setComponents((prevComponents) =>
+      prevComponents.map((comp) =>
+        comp.id === id
+          ? { ...comp, x: newX, y: newY }
+          : comp
+      )
+    );
+  };
+
+  const updateComponentRotation = (id, newRotation) => {
+    console.log("Updating rotation:", id, newRotation);
+
+    setComponents((prevComponents) =>
+      prevComponents.map((comp) =>
+        comp.id === id
+          ? { ...comp, rotation: newRotation }
+          : comp
+      )
+    );
+  };
+
+  const handlePinClick = (componentId, pinId) => {
+    console.log("Pin clicked:", componentId, pinId);
+
+    if (!selectedPin) {
+      setSelectedPin({ componentId, pinId });
+      return;
+    }
+
+    if (
+      selectedPin.componentId === componentId &&
+      selectedPin.pinId === pinId
+    ) {
+      setSelectedPin(null);
+      return;
+    }
+
+    const duplicateWire = wires.some(
+      (wire) =>
+        (wire.from.componentId === selectedPin.componentId &&
+          wire.from.pinId === selectedPin.pinId &&
+          wire.to.componentId === componentId &&
+          wire.to.pinId === pinId) ||
+        (wire.from.componentId === componentId &&
+          wire.from.pinId === pinId &&
+          wire.to.componentId === selectedPin.componentId &&
+          wire.to.pinId === selectedPin.pinId)
+    );
+
+    if (duplicateWire) {
+      alert("These pins are already connected.");
+      setSelectedPin(null);
+      return;
+    }
+
+    const newWire = {
+      id: Date.now(),
+      from: selectedPin,
+      to: { componentId, pinId }
+    };
+
+    console.log("Creating wire:", newWire);
+
+    setWires((prevWires) => [...prevWires, newWire]);
+    setSelectedPin(null);
+  };
+
+  const getPinPosition = (componentId, pinId) => {
+    const component = components.find((c) => c.id === componentId);
+    if (!component) return null;
+
+    const pin = component.pins?.find((p) => p.id === pinId);
+    if (!pin) return null;
+
+    return {
+      x: component.x + pin.dx,
+      y: component.y + pin.dy
+    };
+  };
+
+  const isConnected = (fromComponentId, fromPinId, toComponentId, toPinId) => {
+    return wires.some(
+      (wire) =>
+        (wire.from.componentId === fromComponentId &&
+          wire.from.pinId === fromPinId &&
+          wire.to.componentId === toComponentId &&
+          wire.to.pinId === toPinId) ||
+        (wire.from.componentId === toComponentId &&
+          wire.from.pinId === toPinId &&
+          wire.to.componentId === fromComponentId &&
+          wire.to.pinId === fromPinId)
+    );
+  };
+
+  useEffect(() => {
+    const battery = components.find((c) => c.type === "battery");
+    const led = components.find((c) => c.type === "led");
+
+    if (!battery || !led) return;
+
+    const ledShouldBeOn =
+      isConnected(battery.id, "positive", led.id, "anode") &&
+      isConnected(battery.id, "negative", led.id, "cathode");
+
+    setComponents((prevComponents) =>
+      prevComponents.map((comp) =>
+        comp.type === "led"
+          ? { ...comp, isOn: ledShouldBeOn }
+          : comp
+      )
+    );
+  }, [wires]);
+
+  const saveCircuit = async () => {
+    const circuitData = {
+      components,
+      wires
+    };
+
+    console.log("Sending to backend:", circuitData);
+
+    try {
+      const response = await fetch("http://localhost:5000/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(circuitData)
+      });
+
+      const data = await response.json();
+      console.log("Saved:", data);
+      alert("Circuit saved!");
+    } catch (error) {
+      console.error("Save error:", error);
+      alert("Error saving circuit");
+    }
+  };
+
+  const renderComponent = (comp) => {
+    const commonProps = {
+      key: comp.id,
+      data: comp,
+      selectedPin,
+      onDragEnd: updateComponentPosition,
+      onRotate: updateComponentRotation,
+      onPinClick: handlePinClick
+    };
+
+    if (comp.type === "battery") {
+      return <Battery {...commonProps} />;
+    }
+
+    if (comp.type === "led") {
+      return <LED {...commonProps} />;
+    }
+
+    if (comp.type === "resistor") {
+      return <Resistor {...commonProps} />;
+    }
+
+    return null;
+  };
+
+  return (
+    <>
+      <button
+        onClick={saveCircuit}
+        style={{
+          position: "absolute",
+          top: 10,
+          left: 10,
+          zIndex: 10
+        }}
+      >
+        Save Circuit
+      </button>
+
+      {/* Below is displayer for on screen live change confirmer */}
+      {/*}  <div
+      style={{
+        position: "absolute",
+        top: 50,
+        left: 10,
+        zIndex: 10,
+        background: "white",
+        padding: "8px",
+        border: "1px solid black"
+      }}
+    >
+      {JSON.stringify(components)}
+    </div>
+      */}
+
+      {/* Below is displayer and confirmer for Deploy test version */}
+      <div
+        style={{
+          position: "absolute",
+          top: 80,
+          left: 10,
+          zIndex: 10,
+          background: "yellow",
+          padding: "6px"
+        }}
+      >
+        DEPLOY TEST v3
+      </div>
+
+      {/* LED status confirmer */}
+      <div
+        style={{
+          position: "absolute",
+          top: 120,
+          left: 10,
+          zIndex: 10,
+          background: "lightgreen",
+          padding: "6px",
+          border: "1px solid black"
+        }}
+      >
+        LED Status: {components.find((c) => c.type === "led")?.isOn ? "ON" : "OFF"}
+      </div>
+
+      <Stage width={window.innerWidth} height={window.innerHeight}>
+        <Layer>
+          {wires.map((wire) => {
+            const from = getPinPosition(wire.from.componentId, wire.from.pinId);
+            const to = getPinPosition(wire.to.componentId, wire.to.pinId);
+
+            if (!from || !to) return null;
+
+            return (
+              <Line
+                key={wire.id}
+                points={[from.x, from.y, to.x, to.y]}
+                stroke="black"
+                strokeWidth={2}
+              />
+            );
+          })}
+
+          {components.map((comp) => renderComponent(comp))}
+        </Layer>
+      </Stage>
+    </>
+  );
+}
