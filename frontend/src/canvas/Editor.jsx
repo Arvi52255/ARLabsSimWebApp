@@ -50,9 +50,7 @@ export default function Editor() {
 
     setComponents((prevComponents) =>
       prevComponents.map((comp) =>
-        comp.id === id
-          ? { ...comp, x: newX, y: newY }
-          : comp
+        comp.id === id ? { ...comp, x: newX, y: newY } : comp
       )
     );
   };
@@ -62,9 +60,7 @@ export default function Editor() {
 
     setComponents((prevComponents) =>
       prevComponents.map((comp) =>
-        comp.id === id
-          ? { ...comp, rotation: newRotation }
-          : comp
+        comp.id === id ? { ...comp, rotation: newRotation } : comp
       )
     );
   };
@@ -115,17 +111,26 @@ export default function Editor() {
     setSelectedPin(null);
   };
 
+  const removeWire = (wireId) => {
+    console.log("Removing wire:", wireId);
+    setWires((prevWires) => prevWires.filter((wire) => wire.id !== wireId));
+    setSelectedPin(null);
+  };
+
+  const clearWires = () => {
+    console.log("Clearing all wires");
+    setWires([]);
+    setSelectedPin(null);
+  };
+
   // Rotation-aware pin world position
   const getPinPosition = (component, pin) => {
     if (!component || !pin) return null;
 
     const angle = (component.rotation * Math.PI) / 180;
 
-    const rotatedX =
-      pin.dx * Math.cos(angle) - pin.dy * Math.sin(angle);
-
-    const rotatedY =
-      pin.dx * Math.sin(angle) + pin.dy * Math.cos(angle);
+    const rotatedX = pin.dx * Math.cos(angle) - pin.dy * Math.sin(angle);
+    const rotatedY = pin.dx * Math.sin(angle) + pin.dy * Math.cos(angle);
 
     return {
       x: component.x + rotatedX,
@@ -171,9 +176,7 @@ export default function Editor() {
     if (led.isOn !== ledShouldBeOn) {
       setComponents((prevComponents) =>
         prevComponents.map((comp) =>
-          comp.type === "led"
-            ? { ...comp, isOn: ledShouldBeOn }
-            : comp
+          comp.type === "led" ? { ...comp, isOn: ledShouldBeOn } : comp
         )
       );
     }
@@ -244,6 +247,18 @@ export default function Editor() {
         Save Circuit
       </button>
 
+      <button
+        onClick={clearWires}
+        style={{
+          position: "absolute",
+          top: 45,
+          left: 10,
+          zIndex: 10
+        }}
+      >
+        Clear Wires
+      </button>
+
       {/* Below is displayer for on screen live change confirmer */}
       {/*}  <div
       style={{
@@ -271,7 +286,7 @@ export default function Editor() {
           padding: "6px"
         }}
       >
-        DEPLOY TEST v4.Wires
+        DEPLOY TEST v5.Wire
       </div>
 
       {/* LED status confirmer */}
@@ -286,10 +301,33 @@ export default function Editor() {
           border: "1px solid black"
         }}
       >
-        LED Status: {components.find((c) => c.type === "led")?.isOn ? "ON" : "OFF"}
+        LED Status:{" "}
+        {components.find((c) => c.type === "led")?.isOn ? "ON" : "OFF"}
       </div>
 
-      <Stage width={window.innerWidth} height={window.innerHeight}>
+      <div
+        style={{
+          position: "absolute",
+          top: 160,
+          left: 10,
+          zIndex: 10,
+          background: "#f0f0f0",
+          padding: "6px",
+          border: "1px solid black"
+        }}
+      >
+        Wires: {wires.length} | Click a wire to delete it
+      </div>
+
+        <Stage
+      width={window.innerWidth}
+      height={window.innerHeight}
+      onClick={(e) => {
+        if (e.target === e.target.getStage()) {
+          setSelectedPin(null);
+        }
+      }}
+    >
         <Layer>
           {wires.map((wire) => {
             const from = getPinPositionById(
@@ -309,6 +347,11 @@ export default function Editor() {
                 points={[from.x, from.y, to.x, to.y]}
                 stroke="black"
                 strokeWidth={2}
+                hitStrokeWidth={12}
+                onClick={(e) => {
+                  e.cancelBubble = true;
+                  removeWire(wire.id);
+                }}
               />
             );
           })}
