@@ -1,5 +1,5 @@
 import { Stage, Layer, Line } from "react-konva";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Resistor from "../components/Resistor";
 import Battery from "../components/battery";
 import LED from "../components/LED";
@@ -23,7 +23,6 @@ export default function Editor() {
       x: 300,
       y: 120,
       rotation: 0,
-      isOn: false,
       pins: [
         { id: "anode", dx: -25, dy: 0 },
         { id: "cathode", dx: 25, dy: 0 }
@@ -35,6 +34,7 @@ export default function Editor() {
       x: 500,
       y: 200,
       rotation: 0,
+      value: 220,
       pins: [
         { id: "A", dx: -10, dy: 15 },
         { id: "B", dx: 90, dy: 15 }
@@ -123,6 +123,84 @@ export default function Editor() {
     setSelectedPin(null);
   };
 
+  const makePinKey = (componentId, pinId) => `${componentId}:${pinId}`;
+
+  const buildConnectionGraph = () => {
+    const graph = {};
+
+    const addEdge = (a, b) => {
+      if (!graph[a]) graph[a] = [];
+      if (!graph[b]) graph[b] = [];
+
+      if (!graph[a].includes(b)) graph[a].push(b);
+      if (!graph[b].includes(a)) graph[b].push(a);
+    };
+
+    // External wire connections
+    wires.forEach((wire) => {
+      const fromKey = makePinKey(wire.from.componentId, wire.from.pinId);
+      const toKey = makePinKey(wire.to.componentId, wire.to.pinId);
+      addEdge(fromKey, toKey);
+    });
+
+    // Internal pass-through connections
+    components.forEach((comp) => {
+      if (comp.type === "resistor") {
+        addEdge(makePinKey(comp.id, "A"), makePinKey(comp.id, "B"));
+      }
+    });
+
+    return graph;
+  };
+
+  const hasPath = (graph, start, target) => {
+    if (start === target) return true;
+
+    const visited = new Set();
+    const stack = [start];
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+
+      if (current === target) return true;
+      if (visited.has(current)) continue;
+
+      visited.add(current);
+
+      const neighbors = graph[current] || [];
+      for (const neighbor of neighbors) {
+        if (!visited.has(neighbor)) {
+          stack.push(neighbor);
+        }
+      }
+    }
+
+    return false;
+  };
+
+  const getLedIsOn = () => {
+    const battery = components.find((c) => c.type === "battery");
+    const led = components.find((c) => c.type === "led");
+
+    if (!battery || !led) return false;
+
+    const graph = buildConnectionGraph();
+
+    const batteryPositive = makePinKey(battery.id, "positive");
+    const batteryNegative = makePinKey(battery.id, "negative");
+    const ledAnode = makePinKey(led.id, "anode");
+    const ledCathode = makePinKey(led.id, "cathode");
+
+    const positivePath = hasPath(graph, batteryPositive, ledAnode);
+    const negativePath = hasPath(graph, batteryNegative, ledCathode);
+
+    console.log("Graph:", graph);
+    console.log("Positive path:", positivePath);
+    console.log("Negative path:", negativePath);
+
+    return positivePath && negativePath;
+  };
+
   // Rotation-aware pin world position
   const getPinPosition = (component, pin) => {
     if (!component || !pin) return null;
@@ -149,38 +227,7 @@ export default function Editor() {
     return getPinPosition(component, pin);
   };
 
-  const isConnected = (fromComponentId, fromPinId, toComponentId, toPinId) => {
-    return wires.some(
-      (wire) =>
-        (wire.from.componentId === fromComponentId &&
-          wire.from.pinId === fromPinId &&
-          wire.to.componentId === toComponentId &&
-          wire.to.pinId === toPinId) ||
-        (wire.from.componentId === toComponentId &&
-          wire.from.pinId === toPinId &&
-          wire.to.componentId === fromComponentId &&
-          wire.to.pinId === fromPinId)
-    );
-  };
-
-  useEffect(() => {
-    const battery = components.find((c) => c.type === "battery");
-    const led = components.find((c) => c.type === "led");
-
-    if (!battery || !led) return;
-
-    const ledShouldBeOn =
-      isConnected(battery.id, "positive", led.id, "anode") &&
-      isConnected(battery.id, "negative", led.id, "cathode");
-
-    if (led.isOn !== ledShouldBeOn) {
-      setComponents((prevComponents) =>
-        prevComponents.map((comp) =>
-          comp.type === "led" ? { ...comp, isOn: ledShouldBeOn } : comp
-        )
-      );
-    }
-  }, [wires, components]);
+  const ledIsOn = getLedIsOn();
 
   const saveCircuit = async () => {
     const circuitData = {
@@ -211,7 +258,7 @@ export default function Editor() {
   const renderComponent = (comp) => {
     const commonProps = {
       key: comp.id,
-      data: comp,
+      data: comp.type === "led" ? { ...comp, isOn: ledIsOn } : comp,
       selectedPin,
       onDragEnd: updateComponentPosition,
       onRotate: updateComponentRotation,
@@ -286,7 +333,7 @@ export default function Editor() {
           padding: "6px"
         }}
       >
-        DEPLOY TEST v5.Wire
+        DEPLOY TEST v7. Resistor Update
       </div>
 
       {/* LED status confirmer */}
@@ -301,8 +348,7 @@ export default function Editor() {
           border: "1px solid black"
         }}
       >
-        LED Status:{" "}
-        {components.find((c) => c.type === "led")?.isOn ? "ON" : "OFF"}
+        LED Status: {ledIsOn ? "ON" : "OFF"}
       </div>
 
       <div
@@ -319,15 +365,15 @@ export default function Editor() {
         Wires: {wires.length} | Click a wire to delete it
       </div>
 
-        <Stage
-      width={window.innerWidth}
-      height={window.innerHeight}
-      onClick={(e) => {
-        if (e.target === e.target.getStage()) {
-          setSelectedPin(null);
-        }
-      }}
-    >
+      <Stage
+        width={window.innerWidth}
+        height={window.innerHeight}
+        onClick={(e) => {
+          if (e.target === e.target.getStage()) {
+            setSelectedPin(null);
+          }
+        }}
+      >
         <Layer>
           {wires.map((wire) => {
             const from = getPinPositionById(

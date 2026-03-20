@@ -26,7 +26,8 @@ export default function Resistor({
       onDblClick={handleDoubleClick}
     >
       <Rect width={80} height={30} fill="lightgray" stroke="black" />
-      <Text text="R" x={30} y={8} />
+      <Text text="R" x={18} y={6} fontSize={12} />
+      <Text text={`${data.value || 220}Ω`} x={32} y={8} fontSize={10} />
 
       {data.pins?.map((pin) => {
         const isSelected =
@@ -43,7 +44,13 @@ export default function Resistor({
             fill={isSelected ? "orange" : "red"}
             stroke="black"
             strokeWidth={1}
-            onClick={() => onPinClick(data.id, pin.id)}
+            onMouseDown={(e) => {
+              e.cancelBubble = true;
+            }}
+            onClick={(e) => {
+              e.cancelBubble = true;
+              onPinClick(data.id, pin.id);
+            }}
           />
         );
       })}
