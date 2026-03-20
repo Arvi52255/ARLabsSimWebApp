@@ -115,17 +115,33 @@ export default function Editor() {
     setSelectedPin(null);
   };
 
-  const getPinPosition = (componentId, pinId) => {
+  // Rotation-aware pin world position
+  const getPinPosition = (component, pin) => {
+    if (!component || !pin) return null;
+
+    const angle = (component.rotation * Math.PI) / 180;
+
+    const rotatedX =
+      pin.dx * Math.cos(angle) - pin.dy * Math.sin(angle);
+
+    const rotatedY =
+      pin.dx * Math.sin(angle) + pin.dy * Math.cos(angle);
+
+    return {
+      x: component.x + rotatedX,
+      y: component.y + rotatedY
+    };
+  };
+
+  // Helper using componentId and pinId
+  const getPinPositionById = (componentId, pinId) => {
     const component = components.find((c) => c.id === componentId);
     if (!component) return null;
 
     const pin = component.pins?.find((p) => p.id === pinId);
     if (!pin) return null;
 
-    return {
-      x: component.x + pin.dx,
-      y: component.y + pin.dy
-    };
+    return getPinPosition(component, pin);
   };
 
   const isConnected = (fromComponentId, fromPinId, toComponentId, toPinId) => {
@@ -152,14 +168,16 @@ export default function Editor() {
       isConnected(battery.id, "positive", led.id, "anode") &&
       isConnected(battery.id, "negative", led.id, "cathode");
 
-    setComponents((prevComponents) =>
-      prevComponents.map((comp) =>
-        comp.type === "led"
-          ? { ...comp, isOn: ledShouldBeOn }
-          : comp
-      )
-    );
-  }, [wires]);
+    if (led.isOn !== ledShouldBeOn) {
+      setComponents((prevComponents) =>
+        prevComponents.map((comp) =>
+          comp.type === "led"
+            ? { ...comp, isOn: ledShouldBeOn }
+            : comp
+        )
+      );
+    }
+  }, [wires, components]);
 
   const saveCircuit = async () => {
     const circuitData = {
@@ -253,7 +271,7 @@ export default function Editor() {
           padding: "6px"
         }}
       >
-        DEPLOY TEST v3
+        DEPLOY TEST v4.Wires
       </div>
 
       {/* LED status confirmer */}
@@ -274,8 +292,14 @@ export default function Editor() {
       <Stage width={window.innerWidth} height={window.innerHeight}>
         <Layer>
           {wires.map((wire) => {
-            const from = getPinPosition(wire.from.componentId, wire.from.pinId);
-            const to = getPinPosition(wire.to.componentId, wire.to.pinId);
+            const from = getPinPositionById(
+              wire.from.componentId,
+              wire.from.pinId
+            );
+            const to = getPinPositionById(
+              wire.to.componentId,
+              wire.to.pinId
+            );
 
             if (!from || !to) return null;
 

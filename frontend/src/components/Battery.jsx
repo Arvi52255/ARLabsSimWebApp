@@ -28,6 +28,9 @@ export default function Battery({
       <Rect width={80} height={40} fill="#e8f0ff" stroke="black" />
       <Text text="Battery" x={12} y={12} fontSize={12} />
 
+      <Text text="+" x={8} y={14} fontSize={14} />
+      <Text text="-" x={62} y={14} fontSize={14} />
+
       <Line points={[22, 8, 22, 32]} stroke="black" strokeWidth={2} />
       <Line points={[32, 12, 32, 28]} stroke="black" strokeWidth={2} />
 
