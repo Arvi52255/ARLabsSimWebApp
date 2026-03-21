@@ -404,7 +404,7 @@ export default function Editor() {
           padding: "6px"
         }}
       >
-        DEPLOY TEST v9. Component Value and LED Brightness Update
+        DEPLOY TEST v10. Battery Update
       </div>
 
       {/* LED status confirmer */}
