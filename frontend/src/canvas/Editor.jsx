@@ -3,6 +3,9 @@ import { useState } from "react";
 import Resistor from "../components/Resistor";
 import Battery from "../components/Battery";
 import LED from "../components/LED";
+import { parseCircuit } from "../engine/parser";
+import { validateCircuit } from "../engine/validation";
+import { solveCircuit } from "../engine/solver";
 
 export default function Editor() {
   const [components, setComponents] = useState([
@@ -140,114 +143,21 @@ export default function Editor() {
     setSimulationResult(null);
   };
 
-  const makePinKey = (componentId, pinId) => `${componentId}:${pinId}`;
-
-  const buildConnectionGraph = () => {
-    const graph = {};
-
-    const addEdge = (a, b) => {
-      if (!graph[a]) graph[a] = [];
-      if (!graph[b]) graph[b] = [];
-
-      if (!graph[a].includes(b)) graph[a].push(b);
-      if (!graph[b].includes(a)) graph[b].push(a);
-    };
-
-    wires.forEach((wire) => {
-      const fromKey = makePinKey(wire.from.componentId, wire.from.pinId);
-      const toKey = makePinKey(wire.to.componentId, wire.to.pinId);
-      addEdge(fromKey, toKey);
-    });
-
-    components.forEach((comp) => {
-      if (comp.type === "resistor") {
-        addEdge(makePinKey(comp.id, "A"), makePinKey(comp.id, "B"));
-      }
-    });
-
-    return graph;
-  };
-
-  const hasPath = (graph, start, target) => {
-    if (start === target) return true;
-
-    const visited = new Set();
-    const stack = [start];
-
-    while (stack.length > 0) {
-      const current = stack.pop();
-
-      if (current === target) return true;
-      if (visited.has(current)) continue;
-
-      visited.add(current);
-
-      const neighbors = graph[current] || [];
-      for (const neighbor of neighbors) {
-        if (!visited.has(neighbor)) {
-          stack.push(neighbor);
-        }
-      }
-    }
-
-    return false;
-  };
-
   const runSimulation = () => {
-    const battery = components.find((c) => c.type === "battery");
-    const led = components.find((c) => c.type === "led");
-    const resistor = components.find((c) => c.type === "resistor");
+    const parsed = parseCircuit(components, wires);
+    console.log("Parsed circuit:", parsed);
 
-    if (!battery || !led || !resistor) {
-      setSimulationResult({
-        valid: false,
-        error: "Battery, LED, or resistor is missing."
-      });
+    const validation = validateCircuit(parsed);
+    console.log("Validation result:", validation);
+
+    if (!validation.valid) {
+      setSimulationResult(validation);
       return;
     }
 
-    const graph = buildConnectionGraph();
-
-    const batteryPositive = makePinKey(battery.id, "positive");
-    const batteryNegative = makePinKey(battery.id, "negative");
-    const ledAnode = makePinKey(led.id, "anode");
-    const ledCathode = makePinKey(led.id, "cathode");
-
-    const positivePath = hasPath(graph, batteryPositive, ledAnode);
-    const negativePath = hasPath(graph, batteryNegative, ledCathode);
-
-    console.log("Graph:", graph);
-    console.log("Positive path:", positivePath);
-    console.log("Negative path:", negativePath);
-
-    if (!positivePath || !negativePath) {
-      setSimulationResult({
-        valid: false,
-        error: "Open circuit or incorrect LED connection."
-      });
-      return;
-    }
-
-    if ((resistor.value || 0) <= 0) {
-      setSimulationResult({
-        valid: false,
-        error: "Resistance must be greater than zero."
-      });
-      return;
-    }
-
-    const usableVoltage = (battery.voltage || 0) - (led.forwardVoltage || 0);
-    const current = usableVoltage > 0 ? usableVoltage / resistor.value : 0;
-
-    let brightness = current / 0.02;
-    brightness = Math.max(0, Math.min(brightness, 1));
-
-    setSimulationResult({
-      valid: true,
-      current,
-      ledOn: current > 0,
-      brightness
-    });
+    const result = solveCircuit(parsed);
+    console.log("Solver result:", result);
+    setSimulationResult(result);
   };
 
   const getPinPosition = (component, pin) => {
@@ -404,7 +314,7 @@ export default function Editor() {
           padding: "6px"
         }}
       >
-        DEPLOY TEST v10. Battery Update
+        DEPLOY TEST v11. Engine Files
       </div>
 
       {/* LED status confirmer */}
