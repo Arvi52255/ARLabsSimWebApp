@@ -347,35 +347,47 @@ export default function Editor() {
       </div>
 
       <div
-        style={{
-          position: "absolute",
-          top: 200,
-          left: 10,
-          zIndex: 10,
-          background: "#e8f4ff",
-          padding: "8px",
-          border: "1px solid black",
-          minWidth: "220px"
-        }}
-      >
-        <div>
-          <strong>Simulation Result</strong>
-        </div>
+      
+  style={{
+    position: "absolute",
+    top: 200,
+    left: 10,
+    zIndex: 10,
+    background: "#e8f4ff",
+    padding: "8px",
+    border: "1px solid black",
+    minWidth: "260px"
+  }}
+>
+  <div>
+    <strong>Simulation Result</strong>
+  </div>
 
-        {!simulationResult && <div>Not simulated yet</div>}
+  {!simulationResult && <div>Not simulated yet</div>}
 
-        {simulationResult?.error && <div>Error: {simulationResult.error}</div>}
+  {simulationResult?.error && <div>Error: {simulationResult.error}</div>}
 
-        {simulationResult?.valid && (
-          <>
-            <div>Current: {simulationResult.current.toFixed(4)} A</div>
-            <div>LED: {simulationResult.ledOn ? "ON" : "OFF"}</div>
-            <div>
-              Brightness: {(simulationResult.brightness * 100).toFixed(0)}%
-            </div>
-          </>
-        )}
+  {simulationResult?.warning && (
+    <div style={{ color: "darkorange", marginTop: "6px" }}>
+      {simulationResult.warning}
+    </div>
+  )}
+
+  {simulationResult?.valid && (
+    <>
+      <div>
+        Current:{" "}
+        {simulationResult.current === null
+          ? "Very high / unprotected"
+          : `${simulationResult.current.toFixed(4)} A`}
       </div>
+      <div>LED: {simulationResult.ledOn ? "ON" : "OFF"}</div>
+      <div>
+        Brightness: {(simulationResult.brightness * 100).toFixed(0)}%
+      </div>
+    </>
+  )}
+</div>
 
       {selectedComponent && (
         <div

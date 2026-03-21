@@ -26,12 +26,12 @@ export function hasPath(graph, start, target) {
 }
 
 export function validateCircuit(parsed) {
-  const { battery, led, resistor, graph } = parsed;
+  const { battery, led, graph } = parsed;
 
-  if (!battery || !led || !resistor) {
+  if (!battery || !led) {
     return {
       valid: false,
-      error: "Battery, LED, or resistor is missing."
+      error: "Battery or LED is missing."
     };
   }
 
@@ -47,13 +47,6 @@ export function validateCircuit(parsed) {
     return {
       valid: false,
       error: "Open circuit or incorrect LED connection."
-    };
-  }
-
-  if ((resistor.value || 0) <= 0) {
-    return {
-      valid: false,
-      error: "Resistance must be greater than zero."
     };
   }
 
