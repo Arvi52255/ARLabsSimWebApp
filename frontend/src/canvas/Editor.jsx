@@ -3,6 +3,7 @@ import { useState } from "react";
 import Resistor from "../components/Resistor";
 import Battery from "../components/Battery";
 import LED from "../components/LED";
+import Switch from "../components/Switch";
 import { parseCircuit } from "../engine/parser";
 import { validateCircuit } from "../engine/validation";
 import { solveCircuit } from "../engine/solver";
@@ -45,6 +46,18 @@ export default function Editor() {
       pins: [
         { id: "A", dx: -10, dy: 15 },
         { id: "B", dx: 90, dy: 15 }
+      ]
+    },
+    {
+      id: 4,
+      type: "switch",
+      x: 300,
+      y: 260,
+      rotation: 0,
+      isClosed: true,
+      pins: [
+        { id: "A", dx: 0, dy: 15 },
+        { id: "B", dx: 80, dy: 15 }
       ]
     }
   ]);
@@ -246,6 +259,10 @@ export default function Editor() {
       return <Resistor {...commonProps} />;
     }
 
+    if (comp.type === "switch") {
+      return <Switch {...commonProps} />;
+    }
+
     return null;
   };
 
@@ -287,23 +304,6 @@ export default function Editor() {
         Simulate
       </button>
 
-      {/* Below is displayer for on screen live change confirmer */}
-      {/*}  <div
-      style={{
-        position: "absolute",
-        top: 50,
-        left: 10,
-        zIndex: 10,
-        background: "white",
-        padding: "8px",
-        border: "1px solid black"
-      }}
-    >
-      {JSON.stringify(components)}
-    </div>
-      */}
-
-      {/* Below is displayer and confirmer for Deploy test version */}
       <div
         style={{
           position: "absolute",
@@ -314,10 +314,9 @@ export default function Editor() {
           padding: "6px"
         }}
       >
-        DEPLOY TEST v11. Engine Files
+        DEPLOY TEST v12. Switch Added
       </div>
 
-      {/* LED status confirmer */}
       <div
         style={{
           position: "absolute",
@@ -347,47 +346,46 @@ export default function Editor() {
       </div>
 
       <div
-      
-  style={{
-    position: "absolute",
-    top: 200,
-    left: 10,
-    zIndex: 10,
-    background: "#e8f4ff",
-    padding: "8px",
-    border: "1px solid black",
-    minWidth: "260px"
-  }}
->
-  <div>
-    <strong>Simulation Result</strong>
-  </div>
+        style={{
+          position: "absolute",
+          top: 200,
+          left: 10,
+          zIndex: 10,
+          background: "#e8f4ff",
+          padding: "8px",
+          border: "1px solid black",
+          minWidth: "260px"
+        }}
+      >
+        <div>
+          <strong>Simulation Result</strong>
+        </div>
 
-  {!simulationResult && <div>Not simulated yet</div>}
+        {!simulationResult && <div>Not simulated yet</div>}
 
-  {simulationResult?.error && <div>Error: {simulationResult.error}</div>}
+        {simulationResult?.error && <div>Error: {simulationResult.error}</div>}
 
-  {simulationResult?.warning && (
-    <div style={{ color: "darkorange", marginTop: "6px" }}>
-      {simulationResult.warning}
-    </div>
-  )}
+        {simulationResult?.warning && (
+          <div style={{ color: "darkorange", marginTop: "6px" }}>
+            {simulationResult.warning}
+          </div>
+        )}
 
-  {simulationResult?.valid && (
-    <>
-      <div>
-        Current:{" "}
-        {simulationResult.current === null
-          ? "Very high / unprotected"
-          : `${simulationResult.current.toFixed(4)} A`}
+        {simulationResult?.valid && (
+          <>
+            <div>
+              Current:{" "}
+              {simulationResult.current === null
+                ? "Very high / unprotected"
+                : `${simulationResult.current.toFixed(4)} A`}
+            </div>
+            <div>LED: {simulationResult.ledOn ? "ON" : "OFF"}</div>
+            <div>
+              Brightness: {(simulationResult.brightness * 100).toFixed(0)}%
+            </div>
+          </>
+        )}
       </div>
-      <div>LED: {simulationResult.ledOn ? "ON" : "OFF"}</div>
-      <div>
-        Brightness: {(simulationResult.brightness * 100).toFixed(0)}%
-      </div>
-    </>
-  )}
-</div>
 
       {selectedComponent && (
         <div
@@ -455,6 +453,24 @@ export default function Editor() {
                   )
                 }
               />
+            </div>
+          )}
+
+          {selectedComponent.type === "switch" && (
+            <div>
+              <label>State: </label>
+              <button
+                onClick={() =>
+                  updateComponentField(
+                    selectedComponent.id,
+                    "isClosed",
+                    !selectedComponent.isClosed
+                  )
+                }
+                style={{ marginLeft: "8px" }}
+              >
+                {selectedComponent.isClosed ? "Closed" : "Open"}
+              </button>
             </div>
           )}
         </div>

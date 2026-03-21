@@ -58,7 +58,6 @@ export function solveCircuit(parsed) {
     0
   );
 
-  // No resistor in active path: LED is directly connected to battery
   if (totalResistance === 0) {
     const ledOn = batteryVoltage > ledForwardVoltage;
 

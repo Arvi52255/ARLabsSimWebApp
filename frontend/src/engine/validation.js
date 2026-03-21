@@ -26,7 +26,7 @@ export function hasPath(graph, start, target) {
 }
 
 export function validateCircuit(parsed) {
-  const { battery, led, graph } = parsed;
+  const { battery, led, graph, switches } = parsed;
 
   if (!battery || !led) {
     return {
@@ -44,9 +44,13 @@ export function validateCircuit(parsed) {
   const negativePath = hasPath(graph, batteryNegative, ledCathode);
 
   if (!positivePath || !negativePath) {
+    const hasOpenSwitch = switches.some((sw) => !sw.isClosed);
+
     return {
       valid: false,
-      error: "Open circuit or incorrect LED connection."
+      error: hasOpenSwitch
+        ? "Open circuit: switch is open or connection is incomplete."
+        : "Open circuit or incorrect LED connection."
     };
   }
 
