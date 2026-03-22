@@ -4,68 +4,90 @@ import Resistor from "../components/Resistor";
 import Battery from "../components/Battery";
 import LED from "../components/LED";
 import Switch from "../components/Switch";
+import Toolbox from "../ui/Toolbox";
 import { parseCircuit } from "../engine/parser";
 import { validateCircuit } from "../engine/validation";
 import { solveCircuit } from "../engine/solver";
 
 export default function Editor() {
-  const [components, setComponents] = useState([
-    {
-      id: 1,
-      type: "battery",
-      x: 100,
-      y: 100,
-      rotation: 0,
-      voltage: 9,
-      pins: [
-        { id: "positive", dx: -10, dy: 20 },
-        { id: "negative", dx: 90, dy: 20 }
-      ]
-    },
-    {
-      id: 2,
-      type: "led",
-      x: 300,
-      y: 120,
-      rotation: 0,
-      forwardVoltage: 2,
-      isOn: false,
-      brightness: 0,
-      pins: [
-        { id: "anode", dx: -25, dy: 0 },
-        { id: "cathode", dx: 25, dy: 0 }
-      ]
-    },
-    {
-      id: 3,
-      type: "resistor",
-      x: 500,
-      y: 200,
-      rotation: 0,
-      value: 220,
-      pins: [
-        { id: "A", dx: -10, dy: 15 },
-        { id: "B", dx: 90, dy: 15 }
-      ]
-    },
-    {
-      id: 4,
-      type: "switch",
-      x: 300,
-      y: 260,
-      rotation: 0,
-      isClosed: true,
-      pins: [
-        { id: "A", dx: 0, dy: 15 },
-        { id: "B", dx: 80, dy: 15 }
-      ]
-    }
-  ]);
-
+  const [components, setComponents] = useState([]);
   const [wires, setWires] = useState([]);
   const [selectedPin, setSelectedPin] = useState(null);
   const [selectedComponentId, setSelectedComponentId] = useState(null);
   const [simulationResult, setSimulationResult] = useState(null);
+
+  const addComponent = (type) => {
+    const id = Date.now();
+
+    let newComponent = null;
+
+    if (type === "battery") {
+      newComponent = {
+        id,
+        type: "battery",
+        x: 250,
+        y: 120,
+        rotation: 0,
+        voltage: 9,
+        pins: [
+          { id: "positive", dx: -10, dy: 20 },
+          { id: "negative", dx: 90, dy: 20 }
+        ]
+      };
+    }
+
+    if (type === "led") {
+      newComponent = {
+        id,
+        type: "led",
+        x: 320,
+        y: 180,
+        rotation: 0,
+        forwardVoltage: 2,
+        isOn: false,
+        brightness: 0,
+        pins: [
+          { id: "anode", dx: -25, dy: 0 },
+          { id: "cathode", dx: 25, dy: 0 }
+        ]
+      };
+    }
+
+    if (type === "resistor") {
+      newComponent = {
+        id,
+        type: "resistor",
+        x: 390,
+        y: 240,
+        rotation: 0,
+        value: 220,
+        pins: [
+          { id: "A", dx: -10, dy: 15 },
+          { id: "B", dx: 90, dy: 15 }
+        ]
+      };
+    }
+
+    if (type === "switch") {
+      newComponent = {
+        id,
+        type: "switch",
+        x: 460,
+        y: 300,
+        rotation: 0,
+        isClosed: true,
+        pins: [
+          { id: "A", dx: 0, dy: 15 },
+          { id: "B", dx: 80, dy: 15 }
+        ]
+      };
+    }
+
+    if (!newComponent) return;
+
+    setComponents((prevComponents) => [...prevComponents, newComponent]);
+    setSelectedComponentId(id);
+  };
 
   const updateComponentPosition = (id, newX, newY) => {
     console.log("Updating position:", id, newX, newY);
@@ -314,7 +336,7 @@ export default function Editor() {
           padding: "6px"
         }}
       >
-        DEPLOY TEST v12. Switch Added
+        DEPLOY TEST v13. Toolbox Added
       </div>
 
       <div
@@ -475,6 +497,8 @@ export default function Editor() {
           )}
         </div>
       )}
+
+      <Toolbox onAddComponent={addComponent} />
 
       <Stage
         width={window.innerWidth}
